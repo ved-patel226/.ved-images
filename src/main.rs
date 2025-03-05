@@ -207,7 +207,9 @@ fn decode() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn main() {
-    encode().unwrap();
-    // decode().unwrap();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    encode()?;
+    // decode()?;
+
+    Ok(())
 }
