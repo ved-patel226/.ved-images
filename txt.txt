@@ -1,8 +1,0 @@
-Structure:
-x,y
-#color, #color
-#color, #color, #color
-
-Rules:
-If repeated color, it doesn't save that
-x,y is dimensions of image
