@@ -97,7 +97,34 @@ fn encode() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            new_row.join(",")
+
+            // Compress consecutive empty strings in new_row.
+            let mut compressed = Vec::new();
+            let mut empty_count = 0;
+            for token in new_row {
+                if token.is_empty() {
+                    empty_count += 1;
+                } else {
+                    if empty_count >= 4 {
+                        compressed.push(format!("x{}", empty_count));
+                    } else if empty_count > 0 {
+                        for _ in 0..empty_count {
+                            compressed.push("".to_string());
+                        }
+                    }
+                    empty_count = 0;
+                    compressed.push(token.to_string());
+                }
+            }
+            if empty_count >= 4 {
+                compressed.push(format!("x{}", empty_count));
+            } else if empty_count > 0 {
+                for _ in 0..empty_count {
+                    compressed.push("".to_string());
+                }
+            }
+
+            compressed.join(",")
         })
         .collect();
 
@@ -137,14 +164,6 @@ fn decode() -> Result<(), Box<dyn std::error::Error>> {
 
     let variables_line = lines.next().ok_or("Missing variables line")??;
     let mut variables = HashMap::new();
-
-    // for var in variables_line.split(',') {
-    //     let parts: Vec<&str> = var.split('=').collect();
-    //     if parts.len() == 2 {
-    //         variables.insert(parts[0].parse::<usize>()?, parts[1].to_string());
-    //     }
-    // }
-
     variables_line.split(',').for_each(|var| {
         let parts: Vec<&str> = var.split('=').collect();
         if parts.len() == 2 {
@@ -160,15 +179,23 @@ fn decode() -> Result<(), Box<dyn std::error::Error>> {
         .enumerate()
         .map(|(y, row)| {
             let mut local_last_hex = String::new();
-            let pixels = row
-                .split(',')
+            let mut expanded_tokens = Vec::new();
+            for token in row.split(',') {
+                if token.starts_with('x') {
+                    let count = token[1..].parse::<usize>().unwrap_or(0);
+                    for _ in 0..count {
+                        expanded_tokens.push(local_last_hex.clone());
+                    }
+                } else if token.is_empty() {
+                    expanded_tokens.push(local_last_hex.clone());
+                } else {
+                    local_last_hex = token.to_string();
+                    expanded_tokens.push(local_last_hex.clone());
+                }
+            }
+            let pixels = expanded_tokens
+                .into_iter()
                 .map(|token| {
-                    let token = if token == "" {
-                        local_last_hex.clone()
-                    } else {
-                        local_last_hex = token.to_string();
-                        local_last_hex.clone()
-                    };
                     let color_str = variables
                         .get(&token.parse::<usize>().unwrap_or(usize::MAX))
                         .map(|s| s.as_str())
@@ -194,7 +221,6 @@ fn decode() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     // Write decoded pixels into the image.
-    // Note: decoded_rows may be in any order, so sort by row index.
     let mut sorted_rows = decoded_rows;
     sorted_rows.sort_by_key(|&(y, _)| y);
     for (y, row_pixels) in sorted_rows {
@@ -208,8 +234,8 @@ fn decode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    encode()?;
-    // decode()?;
+    // encode()?;
+    decode()?;
 
     Ok(())
 }
